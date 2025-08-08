@@ -13,10 +13,7 @@ export default function Home() {
   const [remoteId, setRemoteId] = useState<string>("");
 
   useEffect(() => {
-    const id = prompt("Enter your Id") || "";
-    const remoteId = prompt("Enter remote Id") || "";
-    setLocalId(id);
-    setRemoteId(remoteId);
+    setLocalId(Math.floor(100000 + Math.random() * 900000).toString());
 
     const ws = new WebSocket("ws://localhost:8080/signal");
     ws.onmessage = async (event) => {
@@ -28,9 +25,6 @@ export default function Home() {
     setSocket(ws);
   }, []);
 
-  /**
-   * Function to start a video stream
-   */
   const startStream = async () => {
     try {
       if (!socket || !localId || !remoteId) {
@@ -61,9 +55,6 @@ export default function Home() {
     }
   };
 
-  /**
-   * Function to stop streaming
-   */
   const stopStream = async () => {
     try {
     } catch (error) {
@@ -72,66 +63,83 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-4 py-8">
-      <h1 className="text-3xl md:text-4xl font-bold mb-8">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-gray-900 text-white flex flex-col items-center justify-center px-6 py-10">
+      {/* Title */}
+      <h1 className="text-4xl md:text-5xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 drop-shadow-lg">
         Video Stream Interface
       </h1>
+      <p className="text-lg text-gray-300 mb-8">
+        Your ID:{" "}
+        <span className="font-bold text-yellow-400 text-2xl">{localId}</span>
+      </p>
 
-      <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-8 w-full max-w-5xl px-4">
-        <div className="w-full md:w-1/2 flex justify-center">
+      {/* Input */}
+      <div className="flex items-center justify-center gap-2 mt-4 mb-4">
+        <input
+          type="text"
+          placeholder="Enter Remote ID"
+          value={remoteId}
+          onChange={(e) => setRemoteId(e.target.value)}
+          className="px-3 py-2 border border-gray-400 rounded-l-md w-64 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          disabled={!peer}
+          onClick={callPeer}
+          className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl shadow-lg font-semibold transition transform hover:scale-105 disabled:opacity-50 cursor-pointer"
+        >
+          Call Remote ID
+        </button>
+      </div>
+
+      {/* Video Containers */}
+      <div className="flex flex-col md:flex-row items-center justify-center gap-8 mb-10 w-full max-w-6xl">
+        <div className="w-full md:w-1/2 bg-gray-800 rounded-2xl overflow-hidden shadow-lg p-2 border border-gray-700 hover:scale-[1.02] transition">
           <video
             ref={localVideoRef}
             autoPlay
             playsInline
-            className="rounded-lg aspect-video w-full max-w-sm border border-gray-300 shadow-md"
+            className="rounded-xl aspect-video w-full"
           />
         </div>
-        <div className="w-full md:w-1/2 flex justify-center">
+        <div className="w-full md:w-1/2 bg-gray-800 rounded-2xl overflow-hidden shadow-lg p-2 border border-gray-700 hover:scale-[1.02] transition">
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            className="rounded-lg aspect-video w-full max-w-sm border border-gray-300 shadow-md"
+            className="rounded-xl aspect-video w-full"
           />
         </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
+      {/* Buttons */}
+      <div className="flex flex-wrap justify-center gap-4 mb-8">
         <button
           onClick={startStream}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow cursor-pointer"
+          className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl shadow-lg font-semibold transition transform hover:scale-105 cursor-pointer"
         >
           Start Streaming
         </button>
-        <button
-          disabled={!peer}
-          onClick={callPeer}
-          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg shadow cursor-pointer"
-        >
-          Call remote id
-        </button>
+
         <button
           onClick={stopStream}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg shadow cursor-pointer"
+          className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl shadow-lg font-semibold transition transform hover:scale-105 cursor-pointer"
         >
           Stop Streaming
         </button>
       </div>
-      <div className="text-sm text-gray-300 text-center mb-12">
-        <p className="mb-2">
-          1. Click on{" "}
-          <span className="bg-gray-800 px-2 py-0.5 rounded text-white font-mono text-xs">
-            Start Streaming
-          </span>
+
+      {/* Instructions */}
+      <div className="text-sm text-gray-400 text-center mb-12">
+        <p className="mb-1">
+          1. Click{" "}
+          <span className="text-blue-400 font-semibold">Start Streaming</span>
         </p>
-        <p>2. Allow camera and microphone permission</p>
+        <p>2. Allow camera and microphone permissions</p>
       </div>
 
       {/* Footer */}
       <footer className="text-gray-500 text-xs">
-        <p>
-          Made by <span className="text-white font-medium">Ritesh Macwan</span>
-        </p>
+        Made by <span className="text-white font-medium">Ritesh Macwan</span>
       </footer>
     </div>
   );
