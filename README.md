@@ -105,4 +105,3 @@ This project is open-source and available under the MIT License.
 **Ritesh Macwan**  
 Frontend & WebRTC Developer  
 [GitHub](https://github.com/ritesh-7299) • [LinkedIn](https://www.linkedin.com/in/ritesh-macwan-8a70891ba)
-EOF
