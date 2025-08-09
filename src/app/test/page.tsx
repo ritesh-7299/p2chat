@@ -9,8 +9,9 @@ export default function SimpleForm() {
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const [channelReady, setChannelReady] = useState<boolean>(false);
 
-  const [localId, setLocalId] = useState<string>("");
-  const [remoteId, setRemoteId] = useState<string>("");
+  const localIdRef = useRef<string | null>(null);
+  const remoteIdRef = useRef<string | null>(null);
+
   const [socketReady, setSocketReady] = useState<boolean>(false);
 
   const [messages, setMessages] = useState<string[]>([]);
@@ -18,7 +19,8 @@ export default function SimpleForm() {
 
   const socketInit = (id: string) => {
     return new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(`ws://localhost:8080/signal?localId=${id}`);
+      const ws = new WebSocket(`ws://192.168.1.14:8080/signal?localId=${id}`);
+      // const ws = new WebSocket(`ws://localhost:8080/signal?localId=${id}`);
       socketRef.current = ws;
 
       ws.onopen = () => {
@@ -39,6 +41,7 @@ export default function SimpleForm() {
             break;
           case "candidate":
             if (data.candidate) {
+              remoteIdRef.current = data.from;
               console.log("Remote ICE candidate received:", data.candidate);
               peerConnection.current!.addIceCandidate(
                 new RTCIceCandidate(data.candidate)
@@ -47,6 +50,9 @@ export default function SimpleForm() {
 
             break;
         }
+      };
+      ws.onclose = () => {
+        alert("Socket connection closed");
       };
 
       ws.onerror = (err) => {
@@ -58,10 +64,24 @@ export default function SimpleForm() {
 
   useEffect(() => {
     const id = Math.floor(100000 + Math.random() * 900000).toString();
-    setLocalId(id);
+    // setLocalId(id);
+    localIdRef.current = id;
     socketInit(id).catch(console.error);
+    createConnection();
+
+    window.addEventListener("beforeunload", () => {
+      socketRef.current!.close(); // triggers backend disconnect
+    });
+
+    return () => {
+      peerConnection.current?.close();
+      socketRef.current?.close();
+    };
   }, []);
 
+  /**
+   * Function to establish the connection for peer network
+   */
   const createConnection = () => {
     peerConnection.current = new RTCPeerConnection();
 
@@ -70,8 +90,8 @@ export default function SimpleForm() {
       if (event.candidate) {
         sendSignal({
           type: "candidate",
-          from: localId,
-          to: remoteId,
+          from: localIdRef.current!,
+          to: remoteIdRef.current!,
           candidate: event.candidate,
         });
       }
@@ -93,11 +113,19 @@ export default function SimpleForm() {
 
       channel.onclose = () => {
         console.log("Data channel closed");
+        alert("Data channel closed");
       };
     };
   };
 
+  /**
+   * Common function to send emits to the websocket
+   *
+   * @param message
+   * @returns
+   */
   const sendSignal = (message: SignalMessage) => {
+    console.log("message to send to the socket->", message);
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
       console.error("Socket is not ready to send", message);
       return;
@@ -106,11 +134,12 @@ export default function SimpleForm() {
   };
 
   const createOffer = async () => {
-    if (!remoteId) {
+    if (!remoteIdRef.current) {
       alert("Please enter remote id");
       return;
     }
-    createConnection();
+
+    //check if remote user is already having any connection
 
     // Create data channel (on offerer side)
     const dataChannel = peerConnection.current!.createDataChannel("chat");
@@ -133,18 +162,13 @@ export default function SimpleForm() {
     await peerConnection.current!.setLocalDescription(offer);
     sendSignal({
       type: "offer",
-      from: localId,
-      to: remoteId,
+      from: localIdRef.current!,
+      to: remoteIdRef.current!,
       sdp: offer,
     });
   };
 
   const createAnswer = async (offer: any, from: string, to: string) => {
-    if (!socketReady) {
-      console.log("Waiting for socket to connect...");
-      await socketInit(to);
-    }
-    createConnection();
     const offerDesc = new RTCSessionDescription(offer);
     await peerConnection.current!.setRemoteDescription(offerDesc);
     const answer = await peerConnection.current!.createAnswer();
@@ -160,6 +184,13 @@ export default function SimpleForm() {
   const setAnswer = async (answer: any) => {
     const answerDesc = new RTCSessionDescription(answer);
     await peerConnection.current!.setRemoteDescription(answerDesc);
+    console.log("localid::::::", localIdRef.current);
+    console.log("remoteid::::::", remoteIdRef.current);
+    sendSignal({
+      type: "connection",
+      from: remoteIdRef.current!,
+      to: localIdRef.current!,
+    });
     alert("Connected!!!");
   };
 
@@ -184,12 +215,12 @@ export default function SimpleForm() {
   return (
     <div style={{ padding: "20px" }}>
       <form onSubmit={handleSubmit} style={{ gap: "10px" }}>
-        <h1>Local id: {localId}</h1>
+        <h1>Local id: {localIdRef.current}</h1>
         <input
           type="text"
           placeholder="Enter remote id..."
-          value={remoteId}
-          onChange={(e) => setRemoteId(e.target.value)}
+          value={remoteIdRef.current!}
+          onChange={(e) => (remoteIdRef.current = e.target.value)}
           style={{ padding: "8px", flex: 1, border: "1px solid #ccc" }}
         />
         <button
