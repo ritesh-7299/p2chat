@@ -1,103 +1,274 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useEffect, useRef, useState } from "react";
+import { SignalMessage } from "./utils/types";
+
+export default function SimpleForm() {
+  const peerConnection = useRef<RTCPeerConnection | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  const [channelReady, setChannelReady] = useState<boolean>(false);
+
+  const localIdRef = useRef<string | null>(null);
+  const remoteIdRef = useRef<string | null>(null);
+
+  const [socketReady, setSocketReady] = useState<boolean>(false);
+
+  const [messages, setMessages] = useState<string[]>([]);
+  const [messageInput, setMessageInput] = useState<string>("");
+
+  const socketInit = (id: string) => {
+    return new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://localhost:8080/signal?localId=${id}`);
+      socketRef.current = ws;
+
+      ws.onopen = () => {
+        setSocketReady(true);
+        console.log("Socket connected");
+        resolve();
+      };
+
+      ws.onmessage = (event) => {
+        const data: SignalMessage = JSON.parse(event.data);
+        console.log("Received from socket:", data);
+        switch (data.type) {
+          case "offer":
+            createAnswer(data.sdp, data.from, data.to);
+            break;
+          case "answer":
+            setAnswer(data.sdp);
+            break;
+          case "candidate":
+            if (data.candidate) {
+              remoteIdRef.current = data.from;
+              console.log("Remote ICE candidate received:", data.candidate);
+              peerConnection.current!.addIceCandidate(
+                new RTCIceCandidate(data.candidate)
+              );
+            }
+
+            break;
+        }
+      };
+      ws.onclose = () => {
+        alert("Socket connection closed");
+      };
+
+      ws.onerror = (err) => {
+        console.error("Socket error", err);
+        reject(err);
+      };
+    });
+  };
+
+  useEffect(() => {
+    const id = Math.floor(100000 + Math.random() * 900000).toString();
+    // setLocalId(id);
+    localIdRef.current = id;
+    socketInit(id).catch(console.error);
+    createConnection();
+
+    window.addEventListener("beforeunload", () => {
+      socketRef.current!.close(); // triggers backend disconnect
+    });
+
+    return () => {
+      peerConnection.current?.close();
+      socketRef.current?.close();
+    };
+  }, []);
+
+  /**
+   * Function to establish the connection for peer network
+   */
+  const createConnection = () => {
+    peerConnection.current = new RTCPeerConnection();
+
+    peerConnection.current!.onicecandidate = (event) => {
+      console.log("Local ICE candidate:", event.candidate);
+      if (event.candidate) {
+        sendSignal({
+          type: "candidate",
+          from: localIdRef.current!,
+          to: remoteIdRef.current!,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    // Listen for incoming data channel (on answerer side)
+    peerConnection.current.ondatachannel = (event) => {
+      const channel = event.channel;
+      dataChannelRef.current = channel;
+
+      channel.onmessage = (e) => {
+        setMessages((prev) => [...prev, `Peer: ${e.data}`]);
+      };
+
+      channel.onopen = () => {
+        setChannelReady(true);
+        console.log("Data channel opened");
+      };
+
+      channel.onclose = () => {
+        console.log("Data channel closed");
+        alert("Data channel closed");
+      };
+    };
+  };
+
+  /**
+   * Common function to send emits to the websocket
+   *
+   * @param message
+   * @returns
+   */
+  const sendSignal = (message: SignalMessage) => {
+    console.log("message to send to the socket->", message);
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      console.error("Socket is not ready to send", message);
+      return;
+    }
+    socketRef.current.send(JSON.stringify(message));
+  };
+
+  const createOffer = async () => {
+    if (!remoteIdRef.current) {
+      alert("Please enter remote id");
+      return;
+    }
+
+    //check if remote user is already having any connection
+
+    // Create data channel (on offerer side)
+    const dataChannel = peerConnection.current!.createDataChannel("chat");
+    dataChannelRef.current = dataChannel;
+
+    dataChannel.onmessage = (e) => {
+      setMessages((prev) => [...prev, `Peer: ${e.data}`]);
+    };
+
+    dataChannel.onopen = () => {
+      setChannelReady(true);
+      console.log("Data channel opened");
+    };
+
+    dataChannel.onclose = () => {
+      console.log("Data channel closed");
+    };
+
+    const offer = await peerConnection.current!.createOffer();
+    await peerConnection.current!.setLocalDescription(offer);
+    sendSignal({
+      type: "offer",
+      from: localIdRef.current!,
+      to: remoteIdRef.current!,
+      sdp: offer,
+    });
+  };
+
+  const createAnswer = async (offer: any, from: string, to: string) => {
+    const offerDesc = new RTCSessionDescription(offer);
+    await peerConnection.current!.setRemoteDescription(offerDesc);
+    const answer = await peerConnection.current!.createAnswer();
+    await peerConnection.current!.setLocalDescription(answer);
+    sendSignal({
+      type: "answer",
+      from: to,
+      to: from,
+      sdp: answer,
+    });
+  };
+
+  const setAnswer = async (answer: any) => {
+    const answerDesc = new RTCSessionDescription(answer);
+    await peerConnection.current!.setRemoteDescription(answerDesc);
+    console.log("localid::::::", localIdRef.current);
+    console.log("remoteid::::::", remoteIdRef.current);
+    sendSignal({
+      type: "connection",
+      from: remoteIdRef.current!,
+      to: localIdRef.current!,
+    });
+    alert("Connected!!!");
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createOffer();
+  };
+
+  const sendMessage = () => {
+    if (
+      dataChannelRef.current &&
+      dataChannelRef.current.readyState === "open"
+    ) {
+      dataChannelRef.current.send(messageInput);
+      setMessages((prev) => [...prev, `You: ${messageInput}`]);
+      setMessageInput("");
+    } else {
+      alert("Data channel is not open yet.");
+    }
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
+    <div style={{ padding: "20px" }}>
+      <form onSubmit={handleSubmit} style={{ gap: "10px" }}>
+        <h1>Local id: {localIdRef.current}</h1>
+        <input
+          type="text"
+          placeholder="Enter remote id..."
+          value={remoteIdRef.current!}
+          onChange={(e) => (remoteIdRef.current = e.target.value)}
+          style={{ padding: "8px", flex: 1, border: "1px solid #ccc" }}
         />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+        <button
+          type="submit"
+          style={{
+            padding: "8px 12px",
+            cursor: "pointer",
+            backgroundColor: "green",
+            color: "white",
+          }}
+        >
+          Connect
+        </button>
+      </form>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div style={{ marginTop: "20px" }}>
+        <h2>Chat</h2>
+        <div
+          style={{
+            border: "1px solid #ccc",
+            padding: "10px",
+            height: "200px",
+            overflowY: "auto",
+          }}
+        >
+          {messages.map((msg, idx) => (
+            <div key={idx}>{msg}</div>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <input
+          type="text"
+          value={messageInput}
+          onChange={(e) => setMessageInput(e.target.value)}
+          placeholder="Type a message..."
+          style={{ padding: "8px", width: "80%", marginTop: "10px" }}
+        />
+        <button
+          disabled={!channelReady}
+          onClick={sendMessage}
+          style={{
+            padding: "8px 12px",
+            marginLeft: "10px",
+            backgroundColor: "blue",
+            color: "white",
+          }}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          Send
+        </button>
+      </div>
     </div>
   );
 }
