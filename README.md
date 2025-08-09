@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+cat << 'EOF' > README.md
+# 💬 P2Chat Frontend
 
-## Getting Started
+A sleek, real-time peer-to-peer chat and file sharing interface built with Next.js and TypeScript. This frontend connects to the signaling backend via WebSocket and uses WebRTC for direct peer communication.
 
-First, run the development server:
+---
 
-```bash
+## 🌐 Live Preview
+
+To run locally:  
+\`http://localhost:3000\`
+
+---
+
+## 🚀 Features
+
+- ⚡ Real-time messaging via WebRTC  
+- 📁 File sharing using RTCDataChannel  
+- 🔗 Peer-to-peer connection with signaling via WebSocket  
+- 🧠 Intelligent UI feedback for connection status  
+- 🎨 Responsive design with modern styling  
+
+---
+
+## 🧱 Tech Stack
+
+| Layer       | Technology         |
+|-------------|--------------------|
+| Framework   | Next.js (App Router) |
+| Language    | TypeScript         |
+| Styling     | Tailwind CSS       |
+| Fonts       | Geist (via next/font) |
+| WebRTC      | RTCPeerConnection, RTCDataChannel |
+| Signaling   | WebSocket (to backend) |
+
+---
+
+## 📂 Project Structure
+
+\`\`\`
+src/
+├── app/              # Pages and routing
+│   └── page.tsx      # Main chat UI
+├── components/       # Reusable UI components
+├── hooks/            # Custom React hooks
+├── utils/            # WebRTC and signaling helpers
+├── types/            # Type definitions
+└── styles/           # Tailwind config
+\`\`\`
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1. Clone the Repo
+
+\`\`\`bash
+git clone https://github.com/ritesh-7299/p2chat.git
+cd p2chat
+\`\`\`
+
+### 2. Install Dependencies
+
+\`\`\`bash
+npm install
+\`\`\`
+
+### 3. Run the Development Server
+
+\`\`\`bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+\`\`\`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🔌 WebSocket Integration
 
-## Learn More
+Make sure the backend signaling server is running at:
 
-To learn more about Next.js, take a look at the following resources:
+\`\`\`
+ws://localhost:8080/ws?localId=<your-id>
+\`\`\`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The frontend connects automatically using the \`localId\` you provide.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🧪 Testing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Use two browser tabs or devices to simulate peer-to-peer connection.  
+Ensure both clients use unique \`localId\`s and connect to the same signaling server.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 📜 License
+
+This project is open-source and available under the MIT License.
+
+---
+
+## 👨‍💻 Author
+
+**Ritesh Macwan**  
+Frontend & WebRTC Developer  
+[GitHub](https://github.com/ritesh-7299) • [LinkedIn](https://www.linkedin.com/in/ritesh-macwan-8a70891ba)
+EOF
